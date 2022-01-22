@@ -432,6 +432,7 @@ struct FitFileReaderState
                 case 3405: case 3639: return "Garmin Swim 2";
                 case 3558: return "Garmin Edge 130 Plus";
                 case 3570: return "Garmin Edge 1030 Plus";
+                case 3578: return "Garmin Rally 100/200";
                 case 3589: return "Garmin FR745";
                 case 3592: return "Garmin Varia RTL515";
                 case 20119: return "Garmin Training Center";
@@ -1202,6 +1203,14 @@ struct FitFileReaderState
                 case 168:   /* undocumented: Firstbeat EPOC based Exercise Load */
                     active_session_["EPOC"] = QString::number(round(value / 65536.0 ));
                     rideFile->setTag("EPOC", QString::number(round(value / 65536.0 )));
+                    break;
+                case 192:   /* undocumented: Feel manually entered after activity (0-25-50-75-100) */
+                    active_session_["Feel"] = QString::number(round(value));
+                    rideFile->setTag("Feel", QString::number(round(value)));
+                    break;
+                case 193:   /* undocumented: RPE manually entered after activity (0-10) */
+                    active_session_["RPE"] = QString::number(value / 10.0 );
+                    rideFile->setTag("RPE", QString::number(value / 10.0 ));
                     break;
                 case 254: //index
                 case 0:   //event

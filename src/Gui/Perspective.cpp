@@ -77,7 +77,7 @@ static const int tileSpacing = 10;
 
 Perspective::Perspective(Context *context, QString title, int type) :
     GcWindow(context), context(context), active(false),  resizing(false), clicked(NULL), dropPending(false),
-    type_(type), title_(title), chartCursor(-2), df(NULL), expression_("")
+    type_(type), title_(title), chartCursor(-2), df(NULL), expression_(""), trainswitch(None)
 {
     SSS;
     // setup control area
@@ -339,6 +339,7 @@ Perspective::configChanged(qint32)
     for (int i=0; i<charts.count(); i++) {
         if (currentStyle == 0) {
             if (charts[i]->type() == GcWindowTypes::Overview || charts[i]->type() == GcWindowTypes::OverviewTrends) chartbar->setColor(i, GColor(COVERVIEWBACKGROUND));
+            else if (charts[i]->type() == GcWindowTypes::UserAnalysis || charts[i]->type() == GcWindowTypes::UserTrends) chartbar->setColor(i, RGBColor(QColor(charts[i]->property("color").toString())));
             else {
                 if (type() == VIEW_TRAIN)chartbar->setColor(i, GColor(CTRAINPLOTBACKGROUND));
                 else chartbar->setColor(i, GColor(CPLOTBACKGROUND));
@@ -384,6 +385,21 @@ Perspective::titleChanged()
 
         // repaint to reflect
         charts[controlStack->currentIndex()]->repaint();
+    }
+}
+
+// we have a user chart and its just changed its config
+void
+Perspective::userChartConfigChanged(UserChartWindow *chart)
+{
+    if (!currentStyle) {
+        // let chartbar know...
+        for(int index=0; index < charts.count(); index++) {
+            if (charts[index] == (GcChartWindow*)(chart)) {
+                chartbar->setColor(index, RGBColor(QColor(charts[index]->property("color").toString())));
+                return;
+            }
+        }
     }
 }
 
@@ -886,6 +902,16 @@ void
 Perspective::showEvent(QShowEvent *)
 {
     SSS;
+
+    // just before we show lets make sure it all looks good
+    // bear in mind the perspective may have been loaded but
+    // the formatting of contents doesn't happen till we have
+    // a style and we are shown.
+    for(int index=0; index<charts.count(); index++) {
+        if (currentStyle == 0) charts[index]->setContentsMargins(0,0,0,0);
+        else charts[index]->setContentsMargins(0,15*dpiXFactor,0,0);
+    }
+
     resize();
 }
 
@@ -1581,8 +1607,12 @@ void
 Perspective::toXml(QTextStream &out)
 {
     SSS;
-    out<<"<layout name=\""<< title_ <<"\" style=\"" << currentStyle
-       <<"\" type=\"" << type_<<"\" expression=\"" << Utils::xmlprotect(expression_) << "\">\n";
+    out<<"<layout name=\""<< title_
+       <<"\" style=\"" << currentStyle
+       <<"\" type=\"" << type_
+       <<"\" expression=\"" << Utils::xmlprotect(expression_)
+       <<"\" trainswitch=\"" << (int)trainswitch
+       << "\">\n";
 
     // iterate over charts
     foreach (GcChartWindow *chart, charts) {
@@ -1842,8 +1872,8 @@ ImportChartDialog::cancelClicked()
     accept();
 }
 
-AddPerspectiveDialog::AddPerspectiveDialog(QWidget *parent, Context *context, QString &name, QString &expression, int type, bool edit) :
-    QDialog(parent), context(context), name(name), expression(expression), type(type)
+AddPerspectiveDialog::AddPerspectiveDialog(QWidget *parent, Context *context, QString &name, QString &expression, int type, Perspective::switchenum &trainswitch, bool edit) :
+    QDialog(parent), context(context), name(name), expression(expression), trainswitch(trainswitch), type(type)
 {
     SSS;
     setWindowFlags(windowFlags());
@@ -1869,6 +1899,16 @@ AddPerspectiveDialog::AddPerspectiveDialog(QWidget *parent, Context *context, QS
         if (type == VIEW_TRENDS) form->addRow(new QLabel(tr("Activities filter")), filterEdit);
     }
 
+    if (type == VIEW_TRAIN) {
+        trainSwitch = new QComboBox(this);
+        trainSwitch->addItem(tr("Don't switch"), Perspective::None);
+        trainSwitch->addItem(tr("Erg Workout"), Perspective::Erg);
+        trainSwitch->addItem(tr("Slope Workout"), Perspective::Slope);
+        trainSwitch->addItem(tr("Video Workout"), Perspective::Video);
+        trainSwitch->setCurrentIndex(trainswitch);
+        form->addRow(new QLabel(tr("Switch for")), trainSwitch);
+    }
+
     QHBoxLayout *buttons = new QHBoxLayout();
     if (edit) add = new QPushButton(tr("OK"), this);
     else add = new QPushButton(tr("Add"), this);
@@ -1888,6 +1928,7 @@ AddPerspectiveDialog::addClicked()
     SSS;
     name = nameEdit->text();
     if (type == VIEW_ANALYSIS || type == VIEW_TRENDS) expression = filterEdit->text();
+    if (type == VIEW_TRAIN) trainswitch=(Perspective::switchenum)trainSwitch->itemData(trainSwitch->currentIndex(), Qt::UserRole).toInt();
     accept();
 }
 
