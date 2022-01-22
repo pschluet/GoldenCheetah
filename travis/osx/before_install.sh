@@ -9,6 +9,7 @@ export HOMEBREW_NO_INSTALL_CLEANUP=1
 # brew unlink python@2 # to avoid conflicts with qt/libical dependence on python
 
 #brew upgrade qt5 # to get 5.15.x
+brew install qt 5.15
 /usr/local/opt/qt5/bin/qmake --version
 
 brew install libical
